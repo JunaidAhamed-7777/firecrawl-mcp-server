@@ -1,133 +1,85 @@
-# Firecrawl MCP Server Versioning
+# Firecrawl MCP versions and transports
 
-This document explains the versioning system for the Firecrawl MCP Server, which supports both legacy (V1) and modern (V2) versions of the Firecrawl API.
+The npm package version, the Firecrawl API version, and the MCP protocol revision are separate:
 
-## Overview
+- **Package version:** `firecrawl-mcp` follows the version in [package.json](package.json). See [CHANGELOG.md](CHANGELOG.md) for changes.
+- **Firecrawl API:** the current server uses the V2 API. It does not run a separate V1 server or expose the old credential-in-path routes such as `/:apiKey/sse` and `/:apiKey/v2/sse`.
+- **MCP protocol:** the CLI supports revisions `2024-11-05`, `2025-03-26`, `2025-06-18`, and `2025-11-25`. The `modernProtocol` option for embedders using `createFirecrawlMcpServer` additionally enables revision `2026-07-28`; it is not enabled by the CLI.
 
-The server provides versioned endpoints to maintain backward compatibility while supporting the latest Firecrawl features:
+The source retained under `src/legacy/` is historical reference, not a second executable entry point. The package's executable is `dist/index.js`.
 
-- **V1 (Legacy)**: Uses Firecrawl JS 1.29.3 with extended tools
-- **V2 (Current)**: Uses Firecrawl JS 3.1.0 with modern API
+## Local transports
 
-## Endpoints
+The same tools are available over stdio and HTTP, subject to the configured profile and credentials. Transport selection does not select a different Firecrawl API version.
 
-### Hardened HTTP preset (CLOUD_SERVICE=true)
+### stdio (default)
 
-Serves the tools over streamable HTTP on `PORT`, bound to `0.0.0.0`, with a credential required on every request, safe mode on, and upload-only file access. `FASTMCP_ENDPOINT` selects the full (`/v2/mcp`), account (`/v2/mcp-oauth`) or search-only (`/v2/mcp-search`) surface. See the README section "Hardened HTTP preset".
-
-#### Health Check
-- **Health**: `/health`
-- **Readiness**: `/ready`
-
-### Local Service
-
-Local services (stdio, SSE local, HTTP streamable) use the V2 implementation by default.
-
-## Version Differences
-
-### V1 (Firecrawl JS 1.29.3)
-**Available Tools:**
-- `firecrawl_scrape` - Uses `client.scrapeUrl()`
-- `firecrawl_map` - Uses `client.mapUrl()`
-- `firecrawl_crawl` - Uses `client.asyncCrawlUrl()`
-- `firecrawl_check_crawl_status` - Uses `client.checkCrawlStatus()`
-- `firecrawl_search` - Web search functionality
-- `firecrawl_extract` - LLM-powered extraction
-- `firecrawl_deep_research` - Deep research capabilities
-- `firecrawl_generate_llmstxt` - Generate LLMs.txt files
-
-**Key Features:**
-- Legacy API parameter names (`ScrapeParams`, `MapParams`, `CrawlParams`)
-- Deep research functionality
-- LLMs.txt generation
-- System prompt support in extraction
-
-### V2 (Firecrawl JS 3.1.0)
-**Available Tools:**
-- `firecrawl_scrape` - Uses `client.scrape()`
-- `firecrawl_map` - Uses `client.map()`
-- `firecrawl_crawl` - Uses `client.crawl()`
-- `firecrawl_check_crawl_status` - Uses `client.getCrawlStatus()`
-- `firecrawl_search` - Enhanced web search
-- `firecrawl_extract` - Improved extraction
-
-**Key Features:**
-- Modern API parameter names (`ScrapeOptions`, `MapOptions`)
-- Enhanced JSON extraction with schema support
-- Improved format handling
-- Better caching with `maxAge` defaults
-- Support for multiple search sources (web, images, news)
-
-## Migration Guide
-
-### From V1 to V2
-
-1. **Update Endpoint URLs:**
-   ```
-   Old: /:apiKey/sse
-   New: /:apiKey/v2/sse
-   
-   Old: /:apiKey/messages
-   New: /:apiKey/v2/messages
-   ```
-
-2. **Tool Changes:**
-   - Remove usage of `firecrawl_deep_research` and `firecrawl_generate_llmstxt`
-   - Update extraction calls to use the new schema format
-   - Leverage enhanced JSON extraction capabilities
-
-3. **Parameter Updates:**
-   - `maxAge` now defaults to 172800000ms (48 hours) instead of 0
-   - `onlyMainContent` defaults to `true`
-   - Enhanced format options with JSON extraction support
-
-## Testing
-
-Use the provided test script to verify endpoint functionality:
+For an MCP client that launches a command:
 
 ```bash
-# Test all endpoints
-npm run test:endpoints
-
-# Test with custom URL and API key
-TEST_BASE_URL=http://localhost:8080 TEST_API_KEY=your-key npm run test:endpoints
+npx -y firecrawl-mcp
 ```
 
-## Deployment
+Configure credentials through the client's environment when authenticated tools are needed. See the [README](README.md) for API-key, OAuth-token, keyless, and self-hosted API configuration.
 
-### Hardened HTTP preset
+### Streamable HTTP
+
 ```bash
-# Start the server with CLOUD_SERVICE=true
+HTTP_STREAMABLE_SERVER=true npx -y firecrawl-mcp
+```
+
+By default, this listens on `localhost:3000` and serves Streamable HTTP at `/mcp`. `PORT` and `HOST` control the listener. `FASTMCP_ENDPOINT` can select `/v2/mcp`, `/v2/mcp-oauth`, or `/v2/mcp-search`; the account and search profiles have additional authentication requirements described in the README and [search-profile guide](docs/search-profile.md).
+
+For example, to explicitly select the full `/v2/mcp` endpoint:
+
+```bash
+HTTP_STREAMABLE_SERVER=true FASTMCP_ENDPOINT=/v2/mcp npx -y firecrawl-mcp
+```
+
+### Legacy HTTP+SSE transport
+
+The HTTP listener also serves the older MCP transport at `GET /sse`. Its first `endpoint` event supplies `/messages?sessionId=...`; the client posts JSON-RPC messages to that URL and reads replies from the event stream. This is a legacy **MCP transport**, not Firecrawl API V1.
+
+`SSE_LOCAL=true` also enables the HTTP listener. It does not restore the old credential-in-path routes.
+
+### Health checks and network access
+
+The HTTP listener exposes `/health` and `/ready`. These are health endpoints, not MCP connection URLs.
+
+Local HTTP mode checks Host and Origin headers. See [Streamable HTTP local mode](README.md#running-with-streamable-http-local-mode) before configuring a reverse proxy or allowing clients on another machine. Do not expose a listener using a shared server API key to an untrusted network.
+
+## Hardened HTTP preset
+
+`CLOUD_SERVICE=true` selects HTTP, binds to `0.0.0.0`, requires a credential on every request, enables safe mode, and uses upload-only file access. This is the package's hardened preset, not the full configuration of the Firecrawl-operated hosted service.
+
+For a source checkout after building:
+
+```bash
 npm run start:cloud
 ```
 
-### Local Development
+For hosted MCP connection URLs and authentication, use the [README's hosted setup](README.md). Do not construct a hosted URL by adding an API key to a local endpoint path.
+
+## Migrating older configurations
+
+- Replace old credential-in-path configurations with the appropriate current setup in the README. Use the client's supported credential configuration rather than embedding a key in a URL.
+- Discover the available tools with `tools/list`. Historical tools such as `firecrawl_deep_research` and `firecrawl_generate_llmstxt` are not current tool names. The README describes the current Agent and research-paper tools.
+- Use the current tool schemas and README examples for scrape formats and options. V1 SDK method names and option defaults do not describe the current MCP interface.
+
+## Testing from source
+
+Use Node.js 22 or newer. Install dependencies with the lockfile, then run the repository's test suite:
+
 ```bash
-# Start local server (V2 by default)
-npm start
-
-# Start SSE local server
-SSE_LOCAL=true npm start
-
-# Start HTTP streamable server
-HTTP_STREAMABLE_SERVER=true npm start
+pnpm install --frozen-lockfile
+pnpm test
 ```
 
-## Environment Variables
+`pnpm test` builds the package and runs `tests/*.test.mjs`. There is no `test:endpoints` npm script. To run just the protocol and HTTP transport checks after building:
 
-- `CLOUD_SERVICE=true` - Hardened HTTP preset (credential required, safe mode, upload-only file access)
-- `FIRECRAWL_API_KEY` - Your Firecrawl API key
-- `FIRECRAWL_API_URL` - Custom Firecrawl API URL (optional)
-- `PORT` - Server port (default: 3000)
+```bash
+pnpm run build
+node --test --test-concurrency=1 tests/protocol-conformance.test.mjs tests/http-transport-parity.test.mjs
+```
 
-## Backward Compatibility
-
-V1 endpoints will continue to be supported to ensure existing integrations work without modification. However, new features will only be added to V2.
-
-## Support
-
-For issues or questions about versioning:
-1. Check the health endpoint: `/health`
-2. Review the endpoint documentation above
-3. Test with the provided test script
-4. Open an issue on GitHub with version information
+These tests use local mock services; they do not verify a deployed hosted endpoint or call the live Firecrawl API.
