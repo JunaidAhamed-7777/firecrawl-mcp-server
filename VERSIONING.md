@@ -53,7 +53,7 @@ Local HTTP mode checks Host and Origin headers. See [Streamable HTTP local mode]
 
 ## Hardened HTTP preset
 
-`CLOUD_SERVICE=true` selects HTTP, binds to `0.0.0.0`, requires a credential on every request, enables safe mode, and uses upload-only file access. This is the package's hardened preset, not the full configuration of the Firecrawl-operated hosted service.
+`CLOUD_SERVICE=true` selects HTTP, binds to `0.0.0.0`, requires credentials on Streamable HTTP requests and when opening an SSE connection, enables safe mode, and uses upload-only file access. With the full profile, it also starts a search listener on port `3001` by default; set `FIRECRAWL_MCP_SEARCH_ENABLED=false` to disable that listener. This is the package's hardened preset, not the full configuration of the Firecrawl-operated hosted service.
 
 For a source checkout after building:
 
