@@ -25,15 +25,18 @@ Configure credentials through the client's environment when authenticated tools 
 ### Streamable HTTP
 
 ```bash
-HTTP_STREAMABLE_SERVER=true npx -y firecrawl-mcp
+HTTP_STREAMABLE_SERVER=true FIRECRAWL_API_KEY=fc-YOUR_API_KEY npx -y firecrawl-mcp
 ```
+
+Local HTTP requires a credential (from the environment or the request) or a self-hosted `FIRECRAWL_API_URL`. Unlike stdio, it does not offer credential-free cloud access.
 
 By default, this listens on `localhost:3000` and serves Streamable HTTP at `/mcp`. `PORT` and `HOST` control the listener. `FASTMCP_ENDPOINT` can select `/v2/mcp`, `/v2/mcp-oauth`, or `/v2/mcp-search`; the account and search profiles have additional authentication requirements described in the README and [search-profile guide](docs/search-profile.md).
 
 For example, to explicitly select the full `/v2/mcp` endpoint:
 
 ```bash
-HTTP_STREAMABLE_SERVER=true FASTMCP_ENDPOINT=/v2/mcp npx -y firecrawl-mcp
+HTTP_STREAMABLE_SERVER=true FIRECRAWL_API_KEY=fc-YOUR_API_KEY \
+  FASTMCP_ENDPOINT=/v2/mcp npx -y firecrawl-mcp
 ```
 
 ### Legacy HTTP+SSE transport
